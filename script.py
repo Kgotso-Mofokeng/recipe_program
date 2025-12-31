@@ -118,5 +118,3 @@ def recipe_cost(recipes):
 # Add a quantity for milliliters
 
 # Current state of program:
-# - Add to ingredients and recipes databases
-# - Print and comapre total prices of recipes
