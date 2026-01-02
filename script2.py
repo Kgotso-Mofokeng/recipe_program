@@ -23,7 +23,7 @@ def save_db(db, data):
 
 # Ingredient domain model
 class Ingredient:
-	VALID_UNITS = {"kg", "g", "l", "ml"}
+	VALID_UNITS = {"kg", "g", "l", "ml", "eggs"}
 
 	def __init__(self, name, price, qty, unit):
 		self.name = name
@@ -54,6 +54,10 @@ class Ingredient:
 
 		if unit == "ml":
 			return price / qty, "ml"
+
+		# Eggs (edge case)
+		if unit == "eggs":
+			return price / qty
 
 	# Serialization
 	def to_dict(self):
@@ -145,29 +149,136 @@ def add_ingredient(name):
 
 
 # cli commands
-if __name__ == "__main__":
-	# argv[0] = script name
-	# argv[1] = command
-	# argv[2:] = arguments
 
-	if len(sys.argv) < 3:
-		print("Usage: python script.py add_ingredient <name>")
+# Command registry
+COMMANDS = {}
+
+def command(name):
+	def decorator(func):
+		COMMANDS[name] = func
+		return func
+	return decorator
+
+def load_ingredients():
+	return load_db(INGREDIENT_DB)
+
+def load_recipes():
+	return load_db(RECIPE_DB)
+
+@command("add_recipe")
+def add_recipe_cmd(args):
+	if len(args) < 1:
+		print("Usage: add_recipe <name>")
+		return
+
+	name = args[0]
+	recipe = Recipe(name)
+
+	recipe_db = load_recipes()
+	recipe_db[recipe.name] = recipe.to_dict()
+	save_db(RECIPE_DB, recipe_db)
+
+	print(f"Recipe '{name}' created")
+
+@command("add_recipe_ingredient")
+def add_recipe_ingredient_cmd(args):
+	if len(args) < 4:
+		print("Usage: add_recipe_ingredient <recipe> <ingredient> <qty> <unit>")
+		return
+
+	recipe_name, ingredient_name, qty, unit = args
+
+	recipe_db = load_recipes()
+
+	if recipe_name not in recipe_db:
+		print("Recipe not found")
+		return
+
+	recipe = Recipe.from_dict(recipe_name, recipe_db[recipe_name])
+
+	try:
+		recipe.add_ingredient(ingredient_name, float(qty), unit)
+
+	except ValueError as e:
+		print(e)
+		return
+
+	recipe_db[recipe.name] = recipe.to_dict()
+	save_db(RECIPE_DB, recipe_db)
+
+	print(f"Added {ingredient_name} to {recipe_name}")
+
+@command("recipe_cost")
+def recipe_cost_cmd(args):
+	if len(args) < 1:
+		print("Usage: recipe_cost <recipe>")
+		return
+
+	recipe_name = args[0]
+
+	recipe_db = load_recipe()
+	ingredient_db = load_ingredients()
+
+	if recipe_name not in recipe_db:
+		print("Recipe not found")
+		return
+
+	recipe = Recipe.from_dict(recipe_name, recipe_db[recipe_name])
+
+	try:
+		cost = recipe.compute_cost(ingredient_db)
+		print(f"Total cost: R{cost}")
+	except (ValueError, KeyError) as e:
+		print(f"Error: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Entry Point
+if __name__ =="__main__":
+	if len(sys.argv) < 2:
+		print("Available commands:")
+		for cmd in COMMANDS:
+			print(f"  - {cmd}")
 		sys.exit(1)
 
-	command = sys.argv[1]
+	cmd_name = sys.argv[1]
+	args = sys.argv[2:]
 
-	if command == "add_ingredient":
-		name = sys.argv[2]
-		add_ingredient(name)
+	if cmd_name not in COMMANDS:
+		print(f"Unknown command: {cmd_name}")
+		sys.exit(1)
 
-	# Add other if statements for other commands
+	COMMANDS[cmd_name](args)
 
-	else:
-		print(f"Unknown command: {command}")
+
+
+
+
+
+
+
+
 
 ingredient_db = load_db(INGREDIENT_DB)
 print(ingredient_db)
+#recipe_db = load_db(RECIPE_DB)
+#print(recipe_db)
 
 
-# Continue to refactor current functions
-# Find a way to add multiple ingredients using one command
+
+
+
+# Add a command to modify ingredients in recipe database
+# Eggs must be handled differently
